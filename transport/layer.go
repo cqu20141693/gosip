@@ -185,6 +185,7 @@ func (tpl *layer) Listen(network string, addr string, options ...ListenOption) e
 	protocol, ok := tpl.protocols.get(protocolKey(network))
 	if !ok {
 		var err error
+		// 利用tpl 容器构建protocol connectPool
 		protocol, err = protocolFactory(
 			network,
 			tpl.pmsgs,
@@ -337,6 +338,7 @@ func (tpl *layer) serveProtocols() {
 	tpl.Log().Debug("begin serve protocols")
 	defer tpl.Log().Debug("stop serve protocols")
 
+	// 处理传输层数据
 	for {
 		select {
 		case <-tpl.canceled:

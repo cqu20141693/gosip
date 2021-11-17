@@ -1507,6 +1507,47 @@ func (ct *ContentType) Equals(other interface{}) bool {
 	return false
 }
 
+type Authenticate string
+
+func (a *Authenticate) Name() string {
+	return "WWW-Authenticate"
+
+}
+
+func (a Authenticate) Value() string {
+	return string(a)
+}
+
+func (a *Authenticate) Clone() Header {
+	return a
+}
+
+func (a *Authenticate) String() string {
+	return fmt.Sprintf("%s: %s", a.Name(), a.Value())
+}
+
+func (a *Authenticate) Equals(other interface{}) bool {
+	if h, ok := other.(Authenticate); ok {
+		if a == nil {
+			return false
+		}
+
+		return *a == h
+	}
+	if h, ok := other.(*Authenticate); ok {
+		if a == h {
+			return true
+		}
+		if a == nil && h != nil || a != nil && h == nil {
+			return false
+		}
+
+		return *a == *h
+	}
+
+	return false
+}
+
 type Accept string
 
 func (ct *Accept) String() string { return fmt.Sprintf("%s: %s", ct.Name(), ct.Value()) }

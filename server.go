@@ -174,9 +174,9 @@ func (srv *server) Listen(network string, listenAddr string, options ...transpor
 
 func (srv *server) serve() {
 	defer srv.Shutdown()
-
 	for {
 		select {
+		// 处理服务端SIP事务
 		case tx, ok := <-srv.tx.Requests():
 			if !ok {
 				return
@@ -229,10 +229,11 @@ func (srv *server) handleRequest(req sip.Request, tx sip.ServerTransaction) {
 	defer srv.hwg.Done()
 
 	logger := srv.Log().WithFields(req.Fields())
-	logger.Debug("routing incoming SIP request...")
+	logger.Info("routing incoming SIP request...")
 
 	srv.hmu.RLock()
 	handler, ok := srv.requestHandlers[req.Method()]
+
 	srv.hmu.RUnlock()
 
 	if !ok {

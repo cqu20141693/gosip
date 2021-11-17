@@ -185,7 +185,7 @@ func (txl *layer) listenMessages() {
 
 	txl.Log().Debug("start listen messages")
 	defer txl.Log().Debug("stop listen messages")
-
+	// 处理SIP消息
 	for {
 		select {
 		case <-txl.canceled:

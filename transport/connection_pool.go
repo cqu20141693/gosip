@@ -429,6 +429,7 @@ func (pool *connectionPool) serveHandlers() {
 	for {
 		logger := pool.Log()
 
+		// 服务处理器
 		select {
 		case msg, ok := <-pool.hmess:
 			// cancel signal, serveStore exists
@@ -862,6 +863,7 @@ func (handler *connectionHandler) readConnection() (<-chan sip.Message, <-chan e
 	msgs := make(chan sip.Message)
 	errs := make(chan error)
 	streamed := handler.Connection().Streamed()
+	// 	p.output = msgs
 	prs := parser.NewParser(msgs, errs, streamed, handler.Log())
 
 	var raddr net.Addr
@@ -872,7 +874,7 @@ func (handler *connectionHandler) readConnection() (<-chan sip.Message, <-chan e
 		handler.addrs.SetLog(handler.Log())
 		handler.addrs.Run()
 	}
-
+	// 携程读取网络数据到msgs
 	go func() {
 		defer func() {
 			handler.cancelOnce.Do(func() {
@@ -902,6 +904,7 @@ func (handler *connectionHandler) readConnection() (<-chan sip.Message, <-chan e
 
 		for {
 			// wait for data
+			// 读取网络数据
 			if streamed {
 				num, err = handler.Connection().Read(buf)
 			} else {
@@ -949,6 +952,7 @@ func (handler *connectionHandler) readConnection() (<-chan sip.Message, <-chan e
 			}
 
 			// parse received data
+			// 解析接受到数据  p.input.Write(data)
 			if _, err := prs.Write(append([]byte{}, buf[:num]...)); err != nil {
 				select {
 				case <-handler.canceled:
@@ -996,6 +1000,7 @@ func (handler *connectionHandler) pipeOutputs(msgs <-chan sip.Message, errs <-ch
 	handler.Log().Debug("begin pipe outputs")
 	defer handler.Log().Debug("stop pipe outputs")
 
+	// 处理 msgs <-chan sip.Message
 	for {
 		select {
 		case <-handler.canceled:
@@ -1045,7 +1050,7 @@ func (handler *connectionHandler) pipeOutputs(msgs <-chan sip.Message, errs <-ch
 			rhost, rport, _ := net.SplitHostPort(raddr)
 
 			msg.SetDestination(handler.Connection().LocalAddr().String())
-
+			// 处理request msg
 			switch msg := msg.(type) {
 			case sip.Request:
 				// RFC 3261 - 18.2.1

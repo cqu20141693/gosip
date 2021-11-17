@@ -157,6 +157,7 @@ func NewParser(
 	// to allow the parser to block until enough data is available to parse.
 	p.input = newParserBuffer(p.Log())
 	// Done for input a line at a time, and produce SipMessages to send down p.output.
+	// 启动解析
 	go p.parse(streamed)
 
 	return p
@@ -275,6 +276,7 @@ func (p *parser) parse(requireContentLength bool) {
 
 	for {
 		// Parse the StartLine.
+		// 读取input []byte 中的数据解析到output sip.message
 		startLine, err := p.input.NextLine()
 		if err != nil {
 			break
