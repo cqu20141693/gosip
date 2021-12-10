@@ -60,7 +60,7 @@ const (
 
 func (S *SRSFacadeImpl) CreateChannel(id string) int32 {
 	params := "action=" + url.QueryEscape("create_channel") +
-		"&stream=" + url.QueryEscape("[stream]") + "&port_mode=" + url.QueryEscape("fixed") +
+		"&stream=[stream]" + "&port_mode=" + url.QueryEscape("fixed") +
 		"&app=" + url.QueryEscape("live") + "&id=" + url.QueryEscape(id)
 	path := fmt.Sprintf("%s?%s", SRSUrl, params)
 	resp, err := httpCli.Get(path)
@@ -98,7 +98,6 @@ func (d DeviceInfo) Dt() string {
 type DeviceFacadeImpl struct {
 }
 
-func (d *DeviceFacadeImpl) GetDeviceInfo(sn string) *DeviceInfo {
-
+func (d *DeviceFacadeImpl) GetDeviceInfo(cameraId string) *DeviceInfo {
 	return &DeviceInfo{GroupKey: "ccsip", DeviceToken: "ccipcnvr"}
 }

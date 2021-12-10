@@ -1,41 +1,52 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/cqu20141693/go-service-common/boot"
+	"github.com/cqu20141693/go-service-common/config"
+
 	"github.com/ghettovoice/gosip"
+	"github.com/ghettovoice/gosip/gb28181"
 	"github.com/ghettovoice/gosip/log"
 	"github.com/ghettovoice/gosip/sip"
 )
 
 var (
-	logger log.Logger
+	sipLog log.Logger
 )
 
 func init() {
-	logger = log.NewDefaultLogrusLogger().WithPrefix("Server")
+	sipLog = log.NewDefaultLogrusLogger().WithPrefix("Server")
+	//sipLog.SetLevel(log.DebugLevel)
+	port := config.GetStringOrDefault("server.port", ":8080")
+	fmt.Println("port:", port)
 }
 
-var Srv *gosip.Server
-
 func main() {
+	boot.Task()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
 	srvConf := gosip.ServerConfig{UserAgent: "ccsip"}
-	srv := gosip.NewServer(srvConf, nil, nil, logger)
-	srv.OnRequest(sip.INVITE, gosip.OnInvite)
-	srv.OnRequest(sip.MESSAGE, gosip.OnMessage)
-	srv.OnRequest(sip.BYE, gosip.OnBye)
-	srv.OnRequest(sip.REGISTER, gosip.OnRegister)
-	srv.OnRequest(sip.OPTIONS, gosip.OnOptions)
-	srv.OnRequest(sip.ACK, gosip.OnAck)
+	srv := gosip.NewServer(srvConf, nil, nil, sipLog)
+	_ = srv.OnRequest(sip.INVITE, gb28181.OnInvite)
+	_ = srv.OnRequest(sip.MESSAGE, gb28181.OnMessage)
+	_ = srv.OnRequest(sip.BYE, gb28181.OnBye)
+	_ = srv.OnRequest(sip.REGISTER, gb28181.OnRegister)
+	_ = srv.OnRequest(sip.OPTIONS, gb28181.OnOptions)
+	_ = srv.OnRequest(sip.ACK, gb28181.OnAck)
 
-	srv.Listen(gosip.SC.Network, gosip.SC.ListenAddress)
-	gosip.ApiListen(":15093")
-	gosip.SetSrv(srv)
+	err := srv.Listen(gb28181.SC.Network, gb28181.SC.ListenAddress)
+	if err != nil {
+		panic(err)
+		return
+	}
+	gb28181.SetSrv(srv)
+	gb28181.ApiListen(":15093")
 	<-stop
 	srv.Shutdown()
 }
