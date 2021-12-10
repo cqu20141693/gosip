@@ -1,0 +1,15 @@
+server:
+  port: 15093
+cc:
+  application:
+    name: sip-link
+  profiles:
+    active: dev
+sip:
+  serial: 34020000002000000001s
+  realm: 3402000000s
+  expires: 3600
+  listenAddress: 0.0.0.0:5060
+  autoInvite: true
+  catalogInterval: 30
+  password: ccipcnvr
