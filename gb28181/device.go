@@ -3,18 +3,22 @@ package gb28181
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cqu20141693/go-service-common/config"
+	ccredis "github.com/cqu20141693/go-service-common/redis"
+	"github.com/cqu20141693/go-service-common/utils"
+
 	"github.com/ghettovoice/gosip"
 	"github.com/ghettovoice/gosip/sip"
+	"github.com/ghettovoice/gosip/sip/parser"
 	"github.com/ghettovoice/gosip/util"
 )
 
 type GatewayDevice struct {
 	DeviceID string
-	GroupKey string
-	SN       string
 	From     string
 	// 用于注册过期处理
 	RegisterTime time.Time
@@ -22,10 +26,64 @@ type GatewayDevice struct {
 	// 管理通道
 	ChannelMap map[string]*Channel
 	CSeq       uint32
-	Addr       string
+}
+
+func (d *GatewayDevice) cSeqIncr() {
+	key := strings.Join([]string{SipSessionPrefix, d.DeviceID}, Delimiter)
+	result, err := ccredis.RedisDB.HIncrBy(context.Background(), key, "CSeq", 1).Result()
+	if err != nil {
+		return
+	}
+	d.CSeq = uint32(result)
+}
+
+func (d *GatewayDevice) toHashValues() []string {
+	rt := strconv.FormatInt(d.RegisterTime.UnixMilli(), 10)
+	exp := strconv.FormatInt(int64(d.Expires), 10)
+	ip, _ := utils.GetOutBoundIP()
+	port := config.GetString("server.port")
+	return []string{"from", d.From, "rt", rt, "exp", exp, "addr", strings.Join([]string{ip, port}, Delimiter)}
+}
+
+func getDeviceFields() []string {
+	return []string{"from", "rt", "exp", "addr"}
+}
+
+type ChannelInfo struct {
+	CallId string `json:"callId"`
+	FTag   string `json:"fTag"`
+	TTag   string `json:"tTag"`
+}
+
+func CreatChannelInfo(values []interface{}) *ChannelInfo {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Info("CreatChannelInfo occur error")
+			return
+		}
+	}()
+	if len(values) != 3 {
+		return nil
+	}
+	var callId, fTag, tTag string
+	if values[0] != nil {
+		callId = values[0].(string)
+	}
+	if values[1] != nil {
+		fTag = values[1].(string)
+	}
+	if values[2] != nil {
+		tTag = values[2].(string)
+	}
+	return &ChannelInfo{callId, fTag, tTag}
+}
+
+func (r *ChannelInfo) toHashValues() []string {
+	return []string{"callId", r.CallId, "fTag", r.FTag, "tTag", r.TTag}
 }
 
 func (d *GatewayDevice) Query() bool {
+	d.cSeqIncr()
 	recipient := GetRecipient(d.From)
 	contentType := sip.ContentType("Application/MANSCDP+xml")
 
@@ -50,8 +108,13 @@ func (d *GatewayDevice) Query() bool {
 func (d *GatewayDevice) UpdateChannels(list []*Channel) {
 	logger.Info("updateChannels ", list)
 	for i := range list {
-		d.ChannelMap[list[i].ChannelID] = list[i]
-		list[i].ChannelEx = &ChannelEx{
+		channel := list[i]
+		info := GetChannelInfo(channel.ChannelID)
+		if info != nil {
+			Session.channelCache[channel.ChannelID] = info
+		}
+		d.ChannelMap[channel.ChannelID] = channel
+		channel.ChannelEx = &ChannelEx{
 			device: d,
 		}
 	}
@@ -82,7 +145,7 @@ type ChannelEx struct {
 	device *GatewayDevice
 }
 
-func (c *Channel) Invite(start, end int, ssrc []byte) (streamPath string, ok bool) {
+func (c *Channel) Invite(start, end int, ssrc []byte) (streamPath, fCallID, tCallID, tag string, ok bool) {
 
 	// c.Bye()
 	streamPath = c.ChannelID
@@ -132,29 +195,64 @@ func (c *Channel) Invite(start, end int, ssrc []byte) (streamPath string, ok boo
 	}))
 
 	if err != nil || res.StatusCode() != 200 {
-		logger.Info("send query cmd failed,d=", device.SN, err)
-		return "", false
+		logger.Info("send query cmd failed,d=", device.DeviceID, err)
+		return "", "", "", "", false
 	}
 	callID, _ := res.CallID()
 	c.CallId = callID.Value()
 	from, _ := res.From()
+	fTag, _ := from.Params.Get("tag")
 	c.From = from
 	to, _ := res.To()
+	tTag, _ := to.Params.Get("tag")
 	c.To = to
-	return streamPath, true
+	return streamPath, callID.Value(), fTag.String(), tTag.String(), true
 }
 
 func (c *Channel) Bye() bool {
 	if c.CallId != "" {
 		d := c.device
 		recipient := GetRecipient(d.From)
-		d.CSeq++
+		d.cSeqIncr()
 		maxForwards := sip.MaxForwards(70)
 		branchParams := sip.NewParams().Add("branch", sip.String{Str: sip.RFC3261BranchMagicCookie + util.RandString(8)})
 		via := sip.ViaHeader{&sip.ViaHop{ProtocolName: "SIP", ProtocolVersion: "2.0", Transport: "UDP", Host: SC.SipIp, Port: &SC.SipPort, Params: branchParams}}
 		callID := sip.CallID(c.CallId)
 		headers := []sip.Header{&sip.CSeq{SeqNo: d.CSeq, MethodName: sip.BYE}, &maxForwards,
 			&callID, c.From, c.To, via}
+		request := sip.NewRequest(sip.MessageID(util.RandString(10)), sip.BYE, &recipient, "SIP/2.0",
+			headers, "", nil)
+		res, err := srv.RequestWithContext(context.Background(), request)
+		if err != nil {
+			logger.Info("bye failed", err)
+			return false
+		}
+		return res.StatusCode() == 200
+	}
+	return false
+}
+
+func (c *Channel) Bye2() bool {
+	info := Session.GetAndDelChannelInfo(c.ChannelID)
+	if info != nil {
+		d := c.device
+		recipient := GetRecipient(d.From)
+		d.cSeqIncr()
+		maxForwards := sip.MaxForwards(70)
+		branchParams := sip.NewParams().Add("branch", sip.String{Str: sip.RFC3261BranchMagicCookie + util.RandString(8)})
+		via := sip.ViaHeader{&sip.ViaHop{ProtocolName: "SIP", ProtocolVersion: "2.0", Transport: "UDP", Host: SC.SipIp, Port: &SC.SipPort, Params: branchParams}}
+		callID := sip.CallID(info.CallId)
+		fParams := sip.NewParams().Add("tag", sip.String{Str: info.FTag})
+		fAddr := sip.SipUri{
+			FUser: sip.String{Str: "ccsip"},
+			FHost: SC.SipIp,
+			FPort: &SC.SipPort,
+		}
+		from := sip.FromHeader{Address: &fAddr, Params: fParams}
+		tAddr, _ := parser.ParseSipUri(d.From)
+		to := sip.ToHeader{Address: &tAddr, Params: sip.NewParams().Add("tag", sip.String{Str: info.TTag})}
+		headers := []sip.Header{&sip.CSeq{SeqNo: d.CSeq, MethodName: sip.BYE}, &maxForwards,
+			&callID, &from, &to, via}
 		request := sip.NewRequest(sip.MessageID(util.RandString(10)), sip.BYE, &recipient, "SIP/2.0",
 			headers, "", nil)
 		res, err := srv.RequestWithContext(context.Background(), request)

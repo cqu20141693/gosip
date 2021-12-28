@@ -39,14 +39,15 @@ func main() {
 	_ = srv.OnRequest(sip.REGISTER, gb28181.OnRegister)
 	_ = srv.OnRequest(sip.OPTIONS, gb28181.OnOptions)
 	_ = srv.OnRequest(sip.ACK, gb28181.OnAck)
-
+	gb28181.ServerInit()
 	err := srv.Listen(gb28181.SC.Network, gb28181.SC.ListenAddress)
 	if err != nil {
 		panic(err)
 		return
 	}
 	gb28181.SetSrv(srv)
-	gb28181.ApiListen(":15093")
+	gb28181.ServerInit()
+	gb28181.ApiListen(":15093", stop)
 	<-stop
 	srv.Shutdown()
 }

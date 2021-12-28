@@ -1,79 +1,9 @@
-server:
-  port: 15093
 cc:
   application:
     name: sip-link
   profiles:
     active: dev
   log:
-      dir: log
-#  cloud:
-#    nacos:
-#      config:
-#        server-addr: 172.21.88.241:8848
-#        file-extension: yml
-#        namespace: 7b377435-8298-41ba-bf94-d02780873289
-#        register-enabled: false
-#  datasource:
-#    pool:
-#      maxIdleConn: 2
-#      maxOpenConn: 20
-#      connMaxIdleTime: 300
-#      connMaxLifetime: 3600
-#    master:
-#      username: admin
-#      password: cc!@#20210601
-#      url: tcp(172.20.245.149:3306)/link?charset=utf8mb4&collation=utf8mb4_unicode_ci&parseTime=true&multiStatements=true
-#    slave:
-#      username: admin
-#      password: cc!@#20210601
-#      url: tcp(172.21.88.237:3306)/link?charset=utf8mb4&collation=utf8mb4_unicode_ci&parseTime=true&multiStatements=true
-#  redis: # redis server
-#    # must config
-#    database: 0
-#    password: chongC@123
-#    #    addr: 172.19.214.114:6379
-#    sentinel:
-#      master: mymaster
-#      nodes:
-#        - 172.21.88.238:26379
-#        - 172.20.245.148:26379
-#        - 172.20.245.151:26379
-#    # should config
-#    conn-timeout: 5
-#    read-timeout: 3
-#    pool-timeout: 4
-#    idle-timeout: 300
-#    retry: 3
-#    pool-size: 10 # Default is 10 connections per every available CPU as reported by runtime.GOMAXPROCS.
-#    min-idle-conn: 0
-  cloud:
-    nacos:
-      config:
-        server-addr: 172.30.203.22:8848
-        file-extension: yml
-        namespace: ca1d1ded-cb0b-460c-8efa-7e665c7a34e0
-        register-enabled: false
-  redis: # redis server
-    # must config
-    database: 0
-    password: chongC@123
-    addr: 172.19.214.114:6379
-    # should config
-    conn-timeout: 5
-    read-timeout: 3
-    pool-timeout: 4
-    idle-timeout: 300
-    retry: 3
-    pool-size: 10 # Default is 10 connections per every available CPU as reported by runtime.GOMAXPROCS.
-    min-idle-conn: 0
-  datasource:
-    pool:
-      maxIdleConn: 2
-      maxOpenConn: 20
-      connMaxIdleTime: 300
-      connMaxLifetime: 3600
-    master:
-      username: admin
-      password: chongC@123
-      url: tcp(172.19.214.113:3306)/link?charset=utf8mb4&collation=utf8mb4_unicode_ci&parseTime=true&multiStatements=true
+    dir: log
+  srs:
+    url: http://172.30.203.21:1985/api/v1/gb28181

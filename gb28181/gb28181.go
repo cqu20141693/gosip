@@ -100,7 +100,7 @@ func GetRecipient(from string) sip.SipUri {
 func GetSipHeaders(d *GatewayDevice, method sip.RequestMethod, callId sip.CallID) []sip.Header {
 	// 设置via,callId,from,to.max-forwards,Cseq
 	// contentType 和body 一起设置
-	d.CSeq++
+	d.cSeqIncr()
 	maxForwards := sip.MaxForwards(70)
 	if callId == "" {
 		callId = sip.CallID(util.RandString(10))
@@ -140,8 +140,6 @@ type SipMessage struct {
 	RecordList []*Record  `xml:"RecordList>Item"`
 }
 
-var deviceFacade = &spi.DeviceFacadeImpl{}
-
 var srv gosip.Server
 
 func SetSrv(s gosip.Server) {
@@ -171,8 +169,7 @@ var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransac
 			from, _ := req.From()
 			ID := from.Address.User().String()
 			logger.Info("contact=", from)
-
-			cameraDO, err := GetByCameraId(ID)
+			cameraDO, err := spi.DeviceFacadeClient.GetDeviceInfo(ID)
 			if err != nil {
 				value := `realm="3402000000"`
 				value = value + `nonce="` + util.RandString(10) + `"`
@@ -184,7 +181,7 @@ var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransac
 			} else {
 				auth := sip.AuthFromValue(authHeader).
 					SetMethod(string(req.Method())).
-					SetPassword(cameraDO.Token)
+					SetPassword(cameraDO.DeviceToken)
 
 				response := auth.CalcResponse()
 				if response != auth.Response() {
@@ -209,17 +206,22 @@ var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransac
 							break
 						}
 					}
-					device := GatewayDevice{DeviceID: ID, GroupKey: cameraDO.GroupKey, SN: cameraDO.Sn, RegisterTime: time.Now(),
-						Expires: expires, From: from.Address.String(), CSeq: 1, ChannelMap: make(map[string]*Channel, 0)}
-					device.ChannelMap[ID] = &Channel{
-						ChannelID: ID,
-						ChannelEx: &ChannelEx{
-							device: &device,
-						},
+					if expires == 0 {
+						Session.Remove(ID)
+					} else {
+
+						device := GatewayDevice{DeviceID: ID, RegisterTime: time.Now(),
+							Expires: expires, From: from.Address.String(), CSeq: 1, ChannelMap: make(map[string]*Channel, 0)}
+						device.ChannelMap[ID] = &Channel{
+							ChannelID: ID,
+							ChannelEx: &ChannelEx{
+								device: &device,
+							},
+						}
+						// channel Map not set
+						Session.Store(&device, device.Expires*time.Second)
+						go device.Query()
 					}
-					// channel Map not set
-					Session.Store(device.DeviceID, &device, device.Expires*time.Second)
-					go device.Query()
 				}
 			}
 		}
@@ -279,7 +281,7 @@ var OnBye gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction)
 		var res sip.Response
 		_, ok := Session.Get(ID)
 		if ok {
-			Session.Remove(ID)
+			//Session.Remove(ID)
 			res = sip.NewResponseFromRequest("", req, 200, "", "ok")
 		} else {
 			res = sip.NewResponseFromRequest("", req, 401, "Unauthorized", "")
@@ -345,7 +347,7 @@ var OnMessage gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransact
 						res = sip.NewResponseFromRequest("", req, 401, "Unauthorized", "")
 					}
 				} else {
-					res = sip.NewResponseFromRequest("", req, 401, "Unauthorized", "")
+					res = sip.NewResponseFromRequest("", req, 401, "not support content type", "")
 				}
 			} else {
 				res = sip.NewResponseFromRequest("", req, 401, "Unauthorized", "")
@@ -401,4 +403,11 @@ func GbkToUtf8(s []byte) ([]byte, error) {
 		return s, e
 	}
 	return d, nil
+}
+
+func ServerInit() {
+	// redis 读取session
+	// 对session 链路信息进行恢复，初始化channel
+	// 区分节点信息ip：port
+	Session.Recover()
 }

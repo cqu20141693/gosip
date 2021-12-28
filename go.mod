@@ -3,7 +3,7 @@ module github.com/ghettovoice/gosip
 go 1.17
 
 require (
-	github.com/cqu20141693/go-service-common v0.3.1
+	github.com/cqu20141693/go-service-common v0.5.0
 	github.com/discoviking/fsm v0.0.0-20150126104936-f4a273feecca
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-redis/redis/v8 v8.11.4
@@ -21,8 +21,6 @@ require (
 	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf // indirect
 	golang.org/x/text v0.3.7
 )
-
-replace github.com/cqu20141693/go-service-common => ../go-service-common
 
 require (
 	github.com/Microsoft/go-winio v0.5.0 // indirect

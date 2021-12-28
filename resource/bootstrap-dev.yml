@@ -1,0 +1,20 @@
+server:
+  port: 15093
+cc:
+  redis: # redis server
+    # must config
+    database: 0
+    password: chongC@123
+    addr: 172.19.214.114:6379
+    # should config
+    conn-timeout: 5
+    read-timeout: 3
+    pool-timeout: 4
+    idle-timeout: 300
+    retry: 3
+    pool-size: 10 # Default is 10 connections per every available CPU as reported by runtime.GOMAXPROCS.
+    min-idle-conn: 0
+  cloud:
+      nacos:
+          server-addr: 172.30.203.22:8848
+          file-extension: yml
