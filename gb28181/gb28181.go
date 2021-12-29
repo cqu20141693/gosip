@@ -410,4 +410,25 @@ func ServerInit() {
 	// 对session 链路信息进行恢复，初始化channel
 	// 区分节点信息ip：port
 	Session.Recover()
+	go ScheduleTask()
+}
+
+func ScheduleTask() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	// 若通道为空，则阻塞
+	// 若通道有数据，则读取
+	// 若通道关闭，则退出
+	for range ticker.C {
+
+		size := 0
+		Session.session.Range(func(deviceId, device interface{}) bool {
+			size++
+			gatewayDevice := device.(*GatewayDevice)
+			gatewayDevice.Query()
+			return true
+		})
+		logger.Info("ticker device query size=", size)
+	}
 }

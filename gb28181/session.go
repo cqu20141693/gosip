@@ -38,9 +38,8 @@ func (m *MemorySession) Recover() {
 		panic(err)
 	}
 	length := len(allKeys)
-
+	logger.Info("recover ", length)
 	if allKeys != nil && length > 0 {
-
 		for start := 0; start < length; start += 50 {
 			if start+50 > length {
 				handleData(start, length, allKeys)
