@@ -4,10 +4,19 @@ import (
 	"bytes"
 	"encoding/xml"
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
+	"github.com/cqu20141693/go-service-common/config"
+	"github.com/cqu20141693/go-service-common/file"
+	"github.com/cqu20141693/go-service-common/logger/cclog"
+	"github.com/sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -404,13 +413,78 @@ func GbkToUtf8(s []byte) ([]byte, error) {
 	}
 	return d, nil
 }
+func Run(srvConf gosip.ServerConfig) {
+	ServerInit(srvConf)
+}
 
-func ServerInit() {
-	// redis 读取session
-	// 对session 链路信息进行恢复，初始化channel
-	// 区分节点信息ip：port
+func ServerInit(srvConf gosip.ServerConfig) {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	start(srvConf)
 	Session.Recover()
 	go ScheduleTask()
+	port := config.GetStringOrDefault("server.port", "8080")
+	ApiListen(":"+port, stop)
+	<-stop
+	Shutdown()
+}
+
+func Shutdown() {
+	srv.Shutdown()
+}
+
+func newLogger(prefix string) log.Logger {
+	config.Default("cc.log.max-age", 3)
+	config.Default("cc.log.rotate-time", "24h")
+	rotateTime := config.GetString("cc.log.rotate-time")
+	maxAge := config.GetInt64("cc.log.max-age")
+	var path string
+	if logDir := config.GetStringOrDefault("cc.log.dir", ""); logDir != "" {
+		if strings.Contains(logDir, "/") {
+			path = logDir
+		} else {
+			path = file.GetCurrentPath() + string(os.PathSeparator) + logDir
+		}
+	} else {
+		path = file.GetCurrentPath()
+	}
+
+	service := config.GetStringOrDefault("cc.application.name", "service")
+	writer, err := cclog.GetWriter(path, service+".log", rotateTime, maxAge)
+	if err != nil {
+		cclog.Error("rotate writer create failed")
+		defaultLog := log.NewDefaultLogrusLogger().WithPrefix(prefix)
+		return defaultLog
+	}
+	logger := &logrus.Logger{
+		Out:          writer,
+		Formatter:    new(logrus.TextFormatter),
+		Hooks:        make(logrus.LevelHooks),
+		Level:        logrus.InfoLevel,
+		ExitFunc:     os.Exit,
+		ReportCaller: false,
+	}
+	logger.Formatter = &prefixed.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02 15:04:05.000",
+	}
+	return log.NewLogrusLogger(logger, prefix, nil)
+}
+
+func start(srvConf gosip.ServerConfig) {
+	logger = newLogger("User")
+	srv := gosip.NewServer(srvConf, nil, nil, newLogger("server"))
+	_ = srv.OnRequest(sip.INVITE, OnInvite)
+	_ = srv.OnRequest(sip.MESSAGE, OnMessage)
+	_ = srv.OnRequest(sip.BYE, OnBye)
+	_ = srv.OnRequest(sip.REGISTER, OnRegister)
+	_ = srv.OnRequest(sip.OPTIONS, OnOptions)
+	_ = srv.OnRequest(sip.ACK, OnAck)
+	err := srv.Listen(SC.Network, SC.ListenAddress)
+	if err != nil {
+		panic(err)
+	}
+	SetSrv(srv)
 }
 
 func ScheduleTask() {

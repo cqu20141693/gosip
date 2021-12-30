@@ -94,9 +94,6 @@ func NewServer(
 	if txFactory == nil {
 		txFactory = transaction.NewLayer
 	}
-
-	logger = logger.WithPrefix("gosip.Server")
-
 	var host string
 	var ip net.IP
 	if config.Host != "" {
@@ -229,7 +226,7 @@ func (srv *server) handleRequest(req sip.Request, tx sip.ServerTransaction) {
 	defer srv.hwg.Done()
 
 	logger := srv.Log().WithFields(req.Fields())
-	logger.Info("routing incoming SIP request...")
+	logger.Debug("routing incoming SIP request...")
 
 	srv.hmu.RLock()
 	handler, ok := srv.requestHandlers[req.Method()]
