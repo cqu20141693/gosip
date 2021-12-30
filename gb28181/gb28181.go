@@ -161,7 +161,7 @@ var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransac
 	defer wg.Done()
 	if req.Method() == sip.REGISTER && tx.Origin().Method() == sip.REGISTER {
 
-		//logger.Printf("receive REGISTER cmd", req.Recipient(), req.Body(), tx)
+		logger.Info("receive REGISTER cmd", req.Recipient(), req.Headers(), req.Fields())
 		var res sip.Response
 
 		headers := req.GetHeaders("Authorization")
@@ -202,6 +202,7 @@ var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransac
 					res.AppendHeader(&header)
 				} else {
 					// register 成功
+					addr := getSendAddr(req)
 					res = sip.NewResponseFromRequest("", req, 200, "OK", "")
 					from, _ := req.From()
 					var expires time.Duration = 3600
@@ -220,7 +221,7 @@ var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransac
 					} else {
 
 						device := GatewayDevice{DeviceID: ID, RegisterTime: time.Now(),
-							Expires: expires, From: from.Address.String(), CSeq: 1, ChannelMap: make(map[string]*Channel, 0)}
+							Expires: expires, From: from.Address.String(), Addr: addr, CSeq: 1, ChannelMap: make(map[string]*Channel, 0)}
 						device.ChannelMap[ID] = &Channel{
 							ChannelID: ID,
 							ChannelEx: &ChannelEx{
@@ -241,6 +242,40 @@ var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransac
 	} else {
 		logger.Printf("error REGISTER cmd", req, tx)
 	}
+}
+
+func getSendAddr(req sip.Request) string {
+	via, _ := req.Via()
+	var received, rport, host, port string
+	var viaHop *sip.ViaHop
+	for _, hop := range via {
+		if r, ok := hop.Params.Get("received"); ok {
+			received = r.String()
+			viaHop = hop
+		}
+		if rp, ok := hop.Params.Get("rport"); ok {
+			rport = rp.String()
+			viaHop = hop
+		}
+	}
+
+	if rport != "" && rport != "0" && rport != "-1" {
+		port = rport
+	} else if viaHop.Port != nil {
+		port = viaHop.Port.String()
+	} else {
+		if strings.ToUpper(viaHop.Transport) == "UDP" {
+			port = "5060"
+		} else {
+			port = "5061"
+		}
+	}
+	if received != "" {
+		host = received
+	} else {
+		host = viaHop.Host
+	}
+	return host + ":" + port
 }
 
 var OnOptions gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction) {
@@ -329,7 +364,7 @@ var OnMessage gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransact
 	wg.Add(1)
 	defer wg.Done()
 	if req.Method() == sip.MESSAGE && tx.Origin().Method() == sip.MESSAGE {
-
+		logger.Debug("receive Message cmd", req.Recipient(), req.Headers(), req.Fields())
 		from, _ := req.From()
 		ID := from.Address.User().String()
 		device, ok := Session.Get(ID)

@@ -20,6 +20,7 @@ import (
 type GatewayDevice struct {
 	DeviceID string
 	From     string
+	Addr     string
 	// 用于注册过期处理
 	RegisterTime time.Time
 	Expires      time.Duration
@@ -42,7 +43,7 @@ func (d *GatewayDevice) toHashValues() []string {
 	exp := strconv.FormatInt(int64(d.Expires), 10)
 	ip, _ := utils.GetOutBoundIP()
 	port := config.GetString("server.port")
-	return []string{"from", d.From, "rt", rt, "exp", exp, "addr", strings.Join([]string{ip, port}, Delimiter)}
+	return []string{"from", d.From, "send", d.Addr, "rt", rt, "exp", exp, "addr", strings.Join([]string{ip, port}, Delimiter)}
 }
 
 func getDeviceFields() []string {
@@ -97,9 +98,10 @@ func (d *GatewayDevice) Query() bool {
 </Query>`, d.CSeq, d.DeviceID)
 	request := sip.NewRequest(sip.MessageID(util.RandString(10)), sip.MESSAGE, &recipient, "SIP/2.0",
 		headers, body, nil)
+	request.SetDestination(d.Addr)
 	res, err := srv.RequestWithContext(context.Background(), request)
 	if err != nil {
-		logger.Info("query failed", err)
+		logger.Info("query failed ", err)
 		return false
 	}
 	return res.StatusCode() == 200
@@ -178,6 +180,7 @@ func (c *Channel) Invite(start, end int, ssrc []byte) (streamPath, fCallID, tCal
 	headers = append(headers, &contentType)
 	request := sip.NewRequest(sip.MessageID(util.RandString(10)), sip.INVITE, &recipient, "SIP/2.0",
 		headers, strings.Join(inviteSdpInfo, "\r\n")+"\r\n", nil)
+	request.SetDestination(device.Addr)
 	res, err := srv.RequestWithContext(context.Background(), request, gosip.WithResponseHandler(func(res sip.Response, request sip.Request) {
 
 		if res.StatusCode() == 100 {
@@ -222,6 +225,7 @@ func (c *Channel) Bye() bool {
 			&callID, c.From, c.To, via}
 		request := sip.NewRequest(sip.MessageID(util.RandString(10)), sip.BYE, &recipient, "SIP/2.0",
 			headers, "", nil)
+		request.SetDestination(d.Addr)
 		res, err := srv.RequestWithContext(context.Background(), request)
 		if err != nil {
 			logger.Info("bye failed", err)
@@ -255,6 +259,7 @@ func (c *Channel) Bye2() bool {
 			&callID, &from, &to, via}
 		request := sip.NewRequest(sip.MessageID(util.RandString(10)), sip.BYE, &recipient, "SIP/2.0",
 			headers, "", nil)
+		request.SetDestination(d.Addr)
 		res, err := srv.RequestWithContext(context.Background(), request)
 		if err != nil {
 			logger.Info("bye failed", err)

@@ -79,43 +79,48 @@ func handleData(start, end int, keys []string) {
 			logger.Info("value is nil ,key=", key)
 		}
 	}
+	logger.Info("remove keys=", removeKeys)
+	ccredis.RedisDB.Del(context.Background(), removeKeys...)
 }
 
 func checkAndAddSession(deviceId string, value map[string]string) bool {
 	if from, ok := value["from"]; ok {
-
-		if rt, ok := value["rt"]; ok {
-			parseInt, err := strconv.ParseInt(rt, 10, 64)
-			if err != nil {
-				return false
-			}
-			registerTime := time.UnixMilli(parseInt)
-			if expire, ok := value["exp"]; ok {
-
-				exp, err := strconv.ParseInt(expire, 10, 64)
+		if addr, ok := value["send"]; ok {
+			if rt, ok := value["rt"]; ok {
+				parseInt, err := strconv.ParseInt(rt, 10, 64)
 				if err != nil {
 					return false
 				}
-				CSeq := uint32(1)
-				if cseq, ok := value["CSeq"]; ok {
-					cseqInt, err := strconv.ParseInt(cseq, 10, 64)
+				registerTime := time.UnixMilli(parseInt)
+				if expire, ok := value["exp"]; ok {
+
+					exp, err := strconv.ParseInt(expire, 10, 64)
 					if err != nil {
 						return false
 					}
-					CSeq = uint32(cseqInt)
-				}
+					CSeq := uint32(1)
+					if cseq, ok := value["CSeq"]; ok {
+						cseqInt, err := strconv.ParseInt(cseq, 10, 64)
+						if err != nil {
+							return false
+						}
+						CSeq = uint32(cseqInt)
+					}
 
-				channelMap := make(map[string]*Channel, 0)
-				device := GatewayDevice{DeviceID: deviceId, From: from, RegisterTime: registerTime, Expires: time.Duration(exp), CSeq: CSeq, ChannelMap: channelMap}
-				device.ChannelMap[deviceId] = &Channel{
-					ChannelID: deviceId,
-					ChannelEx: &ChannelEx{
-						device: &device,
-					},
+					channelMap := make(map[string]*Channel, 0)
+					device := GatewayDevice{DeviceID: deviceId, From: from, Addr: addr, RegisterTime: registerTime, Expires: time.Duration(exp), CSeq: CSeq, ChannelMap: channelMap}
+					device.ChannelMap[deviceId] = &Channel{
+						ChannelID: deviceId,
+						ChannelEx: &ChannelEx{
+							device: &device,
+						},
+					}
+					Session.Store(&device, device.Expires)
+					device.Query()
+					return true
+				} else {
+					return false
 				}
-				Session.Store(&device, device.Expires)
-				device.Query()
-				return true
 			} else {
 				return false
 			}
