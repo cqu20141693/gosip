@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cqu20141693/go-service-common/config"
+	"github.com/cqu20141693/go-service-common/event"
 	"github.com/cqu20141693/go-service-common/file"
 	"github.com/cqu20141693/go-service-common/logger/cclog"
 	"github.com/sirupsen/logrus"
@@ -37,6 +38,12 @@ var (
 func init() {
 	logger = log.NewDefaultLogrusLogger().WithPrefix("Server")
 	wg = new(sync.WaitGroup)
+	event.RegisterHook(event.ConfigComplete, event.NewHookContext(initSip, "initSip"))
+}
+
+func initSip() {
+	sub := config.Sub("cc.sip")
+	sub.Unmarshal(SC)
 }
 
 type ResultCommon struct {
@@ -81,9 +88,9 @@ func NewDefaultSipConfig() *SipConfig {
 		Realm:         "3402000000",
 		Network:       "udp",
 		ListenAddress: "0.0.0.0:5060",
-		SipIp:         "192.168.0.123",
+		SipIp:         "127.0.0.1",
 		SipPort:       5060,
-		MediaIP:       "47.108.93.28",
+		MediaIp:       "127.0.0.1",
 		MediaPort:     9000,
 		AudioEnable:   false,
 	}
@@ -96,7 +103,7 @@ type SipConfig struct {
 	ListenAddress string   `json:"listenAddress"`
 	SipIp         string   // sip 服务器ip
 	SipPort       sip.Port // sip 服务器端口
-	MediaIP       string   //媒体服务器地址
+	MediaIp       string   //媒体服务器地址
 	MediaPort     uint16   //媒体服务器端口
 	AudioEnable   bool     //是否开启音频
 }
@@ -508,6 +515,7 @@ func newLogger(prefix string) log.Logger {
 
 func start(srvConf gosip.ServerConfig) {
 	logger = newLogger("User")
+	logger.Info("sc= ", SC)
 	srv := gosip.NewServer(srvConf, nil, nil, newLogger("server"))
 	_ = srv.OnRequest(sip.INVITE, OnInvite)
 	_ = srv.OnRequest(sip.MESSAGE, OnMessage)

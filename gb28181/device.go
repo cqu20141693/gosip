@@ -84,7 +84,7 @@ func (r *ChannelInfo) toHashValues() []string {
 }
 
 func (d *GatewayDevice) Query() bool {
-	d.cSeqIncr()
+	//d.cSeqIncr()
 	recipient := GetRecipient(d.From)
 	contentType := sip.ContentType("Application/MANSCDP+xml")
 
@@ -159,10 +159,10 @@ func (c *Channel) Invite(start, end int, ssrc []byte) (streamPath, fCallID, tCal
 
 	inviteSdpInfo := []string{
 		"v=0",
-		fmt.Sprintf("o=%s 0 0 IN IP4 %s", SC.Serial, SC.MediaIP),
+		fmt.Sprintf("o=%s 0 0 IN IP4 %s", SC.Serial, SC.MediaIp),
 		"s=" + s,
 		"u=" + c.ChannelID + ":0",
-		"c=IN IP4 " + SC.MediaIP,
+		"c=IN IP4 " + SC.MediaIp,
 		fmt.Sprintf("t=%d %d", start, end),
 		fmt.Sprintf("m=video %d RTP/AVP 96 97 98", SC.MediaPort),
 		"a=recvonly",

@@ -136,6 +136,7 @@ func GetClient() client.Client {
 }
 
 func (d *DeviceFacadeImpl) GetDeviceInfo(cameraId string) (*DeviceInfo, error) {
+	// 单独提供一个查询摄像头的接口
 	endpoint := "/api/device/meta/getByDeviceKey?deviceKey=" + cameraId
 	request := d.c.NewRequest(d.name, endpoint, "")
 	type result struct {
