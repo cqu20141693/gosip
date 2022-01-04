@@ -165,7 +165,12 @@ func SetSrv(s gosip.Server) {
 var OnRegister gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction) {
 
 	wg.Add(1)
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+		if err := recover(); err != nil {
+			logger.Info("occur panic ", err)
+		}
+	}()
 	if req.Method() == sip.REGISTER && tx.Origin().Method() == sip.REGISTER {
 
 		logger.Info("receive REGISTER cmd", req.Recipient(), req.Headers(), req.Fields())
@@ -288,7 +293,12 @@ func getSendAddr(req sip.Request) string {
 var OnOptions gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction) {
 
 	wg.Add(1)
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+		if err := recover(); err != nil {
+			logger.Info("occur panic ", err)
+		}
+	}()
 	if req.Method() == sip.OPTIONS && tx.Origin().Method() == sip.OPTIONS {
 		from, _ := req.From()
 		ID := from.Address.User().String()
@@ -310,7 +320,12 @@ var OnOptions gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransact
 var OnInvite gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction) {
 
 	wg.Add(1)
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+		if err := recover(); err != nil {
+			logger.Info("occur panic ", err)
+		}
+	}()
 	if req.Method() == sip.INVITE && tx.Origin().Method() == sip.INVITE {
 		res := sip.NewResponseFromRequest("", req, 405, "Method Not Allowed", "")
 		if _, err := srv.Respond(res); err != nil {
@@ -323,7 +338,12 @@ var OnInvite gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransacti
 var OnBye gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction) {
 
 	wg.Add(1)
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+		if err := recover(); err != nil {
+			logger.Info("occur panic ", err)
+		}
+	}()
 	if req.Method() == sip.BYE && tx.Origin().Method() == sip.BYE {
 
 		// 利用callId
@@ -347,7 +367,12 @@ var OnBye gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction)
 var OnAck gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction) {
 
 	wg.Add(1)
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+		if err := recover(); err != nil {
+			logger.Info("occur panic ", err)
+		}
+	}()
 	if req.Method() == sip.ACK && tx.Origin().Method() == sip.ACK {
 		from, _ := req.From()
 		ID := from.Address.User().String()
@@ -369,7 +394,12 @@ var OnAck gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction)
 var OnMessage gosip.RequestHandler = func(req sip.Request, tx sip.ServerTransaction) {
 
 	wg.Add(1)
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+		if err := recover(); err != nil {
+			logger.Info("occur panic ", err)
+		}
+	}()
 	if req.Method() == sip.MESSAGE && tx.Origin().Method() == sip.MESSAGE {
 		logger.Debug("receive Message cmd", req.Recipient(), req.Headers(), req.Fields())
 		from, _ := req.From()
