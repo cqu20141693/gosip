@@ -260,12 +260,29 @@ func (c *Channel) Bye2() bool {
 		request := sip.NewRequest(sip.MessageID(util.RandString(10)), sip.BYE, &recipient, "SIP/2.0",
 			headers, "", nil)
 		request.SetDestination(d.Addr)
-		res, err := srv.RequestWithContext(context.Background(), request)
-		if err != nil {
-			logger.Info("bye failed", err)
+		deadline := time.Now().Add(time.Second * 10)
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
+		defer cancel()
+		result := make(chan sip.Response, 1)
+		go func() {
+			res, err := srv.RequestWithContext(ctx, request)
+			if err != nil {
+				logger.Info("bye failed", err)
+				result <- nil
+			}
+			result <- res
+		}()
+
+		select {
+		case v := <-result:
+			if v == nil {
+				return false
+			}
+			return v.StatusCode() == 200
+		case <-ctx.Done():
 			return false
 		}
-		return res.StatusCode() == 200
+
 	}
 	return false
 }
