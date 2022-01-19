@@ -78,6 +78,10 @@ var Invite = func(giCxt *gin.Context) {
 		return
 	}
 	if c, ok := FindChannel(id, channel); ok {
+		if c.invited {
+			giCxt.JSON(200, ResultUtils.Success(channel))
+			return
+		}
 		c.Bye2()
 		ret := spi.SrsFacade.CreateChannel(channel)
 		var ssrc []byte
@@ -90,8 +94,9 @@ var Invite = func(giCxt *gin.Context) {
 		start, _ := strconv.Atoi(startTime)
 		end, _ := strconv.Atoi(endTime)
 		streamPath, callID, fTag, tTag, ok := c.Invite(start, end, ssrc)
-		Session.AddChannelInfo(channel, &ChannelInfo{callID, fTag, tTag})
 		if ok {
+			c.invited = true
+			Session.AddChannelInfo(channel, &ChannelInfo{callID, fTag, tTag})
 			giCxt.JSON(200, ResultUtils.Success(streamPath))
 		} else {
 			giCxt.JSON(200, ResultUtils.Fail("11001", "invite failed"))

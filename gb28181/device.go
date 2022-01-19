@@ -123,6 +123,7 @@ func (d *GatewayDevice) UpdateChannels(list []*Channel) {
 }
 
 type Channel struct {
+	invited      bool
 	ChannelID    string `xml:"DeviceID"`
 	ParentID     string
 	Name         string
@@ -149,7 +150,6 @@ type ChannelEx struct {
 
 func (c *Channel) Invite(start, end int, ssrc []byte) (streamPath, fCallID, tCallID, tag string, ok bool) {
 
-	// c.Bye()
 	streamPath = c.ChannelID
 	s := "Play"
 	if start != 0 {
