@@ -237,6 +237,7 @@ func (c *Channel) Bye() bool {
 }
 
 func (c *Channel) Bye2() bool {
+	c.invited = false
 	info := Session.GetAndDelChannelInfo(c.ChannelID)
 	if info != nil {
 		d := c.device
