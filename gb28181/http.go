@@ -79,7 +79,7 @@ var Invite = func(giCxt *gin.Context) {
 	}
 	if c, ok := FindChannel(id, channel); ok {
 		if c.invited {
-			giCxt.JSON(200, ResultUtils.Success(channel))
+			giCxt.JSON(200, ResultUtils.Success("invited"))
 			return
 		}
 		c.Bye2()
