@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -78,7 +79,7 @@ var Invite = func(giCxt *gin.Context) {
 		return
 	}
 	if c, ok := FindChannel(id, channel); ok {
-		if c.invited {
+		if atomic.LoadInt32(&c.invited) == 1 {
 			giCxt.JSON(200, ResultUtils.Success("invited"))
 			return
 		}
@@ -93,14 +94,18 @@ var Invite = func(giCxt *gin.Context) {
 		}
 		start, _ := strconv.Atoi(startTime)
 		end, _ := strconv.Atoi(endTime)
-		streamPath, callID, fTag, tTag, ok := c.Invite(start, end, ssrc)
-		if ok {
-			c.invited = true
-			Session.AddChannelInfo(channel, &ChannelInfo{callID, fTag, tTag})
-			giCxt.JSON(200, ResultUtils.Success(streamPath))
-		} else {
-			giCxt.JSON(200, ResultUtils.Fail("11001", "invite failed"))
+		if atomic.CompareAndSwapInt32(&c.invited, 0, 1) {
+			streamPath, callID, fTag, tTag, ok := c.Invite(start, end, ssrc)
+			if ok {
+
+				Session.AddChannelInfo(channel, &ChannelInfo{callID, fTag, tTag})
+				giCxt.JSON(200, ResultUtils.Success(streamPath))
+			} else {
+				atomic.StoreInt32(&c.invited, 0)
+				giCxt.JSON(200, ResultUtils.Fail("11001", "invite failed"))
+			}
 		}
+
 	} else {
 		giCxt.JSON(200, ResultUtils.Fail("11002", "device not online"))
 	}

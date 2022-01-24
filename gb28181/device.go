@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/cqu20141693/go-service-common/config"
@@ -123,7 +124,7 @@ func (d *GatewayDevice) UpdateChannels(list []*Channel) {
 }
 
 type Channel struct {
-	invited      bool
+	invited      int32
 	ChannelID    string `xml:"DeviceID"`
 	ParentID     string
 	Name         string
@@ -237,7 +238,7 @@ func (c *Channel) Bye() bool {
 }
 
 func (c *Channel) Bye2() bool {
-	c.invited = false
+	atomic.StoreInt32(&c.invited, 0)
 	info := Session.GetAndDelChannelInfo(c.ChannelID)
 	if info != nil {
 		d := c.device
