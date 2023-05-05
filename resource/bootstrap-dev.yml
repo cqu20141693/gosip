@@ -4,8 +4,7 @@ cc:
   redis: # redis server
     # must config
     database: 0
-    password: chongC@123
-    addr: 172.19.214.114:6379
+    addr: localhost:6379
     # should config
     conn-timeout: 5
     read-timeout: 3
@@ -14,9 +13,16 @@ cc:
     retry: 3
     pool-size: 10 # Default is 10 connections per every available CPU as reported by runtime.GOMAXPROCS.
     min-idle-conn: 0
+  datasource:
+    master:
+      username: root
+      password: root
+      url: tcp(localhost:3306)/gaea_iiot?charset=utf8&parseTime=True&loc=Local&timeout=10s&readTimeout=30s&writeTimeout=60s
+    pool:
+      maxOpenConn: 8
   cloud:
     nacos:
-      server-addr: 172.30.203.22:8848
+      server-addr: 10.113.75.55:8848
       file-extension: yml
   sip:
     sipIp: 192.168.0.123

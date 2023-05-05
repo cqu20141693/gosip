@@ -18,7 +18,6 @@ import (
 func ApiListen(address string, stop chan os.Signal) {
 	//gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
-
 	engine.GET("/getSession", GetSession)
 	engine.POST("/addSession", AddSession)
 	engine.POST("/invite", Invite)
@@ -26,7 +25,8 @@ func ApiListen(address string, stop chan os.Signal) {
 	engine.POST("/bye", Bye)
 	engine.POST("/bye2", Bye2)
 	engine.POST("/query", Query)
-
+	service := &CameraService{}
+	service.InitRouterMapper(engine)
 	go func() {
 		err := engine.Run(address)
 		if err != nil {
