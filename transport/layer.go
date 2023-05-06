@@ -181,23 +181,10 @@ func (tpl *layer) Listen(network string, addr string, options ...ListenOption) e
 		return fmt.Errorf("transport layer is canceled")
 	default:
 	}
-
-	protocol, ok := tpl.protocols.get(protocolKey(network))
-	if !ok {
-		var err error
-		// 利用tpl 容器构建protocol connectPool
-		protocol, err = protocolFactory(
-			network,
-			tpl.pmsgs,
-			tpl.perrs,
-			tpl.canceled,
-			tpl.msgMapper,
-			tpl.Log(),
-		)
-		if err != nil {
-			return err
-		}
-		tpl.protocols.put(protocolKey(protocol.Network()), protocol)
+	//note-利用tpl 容器构建protocol connectPool
+	protocol, err := tpl.getProtocol(network)
+	if err != nil {
+		return err
 	}
 	target, err := NewTargetFromAddr(addr)
 	if err != nil {
@@ -238,12 +225,12 @@ func (tpl *layer) Send(msg sip.Message) error {
 	case sip.Request:
 		network := msg.Transport()
 		// rewrite sent-by transport
-		viaHop.Transport = network
+		viaHop.Transport = strings.ToUpper(network)
 		viaHop.Host = tpl.ip.String()
 
-		protocol, ok := tpl.protocols.get(protocolKey(network))
-		if !ok {
-			return UnsupportedProtocolError(fmt.Sprintf("protocol %s is not supported", network))
+		protocol, err := tpl.getProtocol(network)
+		if err != nil {
+			return err
 		}
 
 		// rewrite sent-by port
@@ -273,7 +260,11 @@ func (tpl *layer) Send(msg sip.Message) error {
 				case "UDP":
 					if addr, err := net.ResolveUDPAddr("udp", addrStr); err == nil {
 						port := sip.Port(addr.Port)
-						target.Host = addr.IP.String()
+						if addr.IP.To4() == nil {
+							target.Host = fmt.Sprintf("[%v]", addr.IP.String())
+						} else {
+							target.Host = addr.IP.String()
+						}
 						target.Port = &port
 					}
 				case "TLS":
@@ -285,12 +276,18 @@ func (tpl *layer) Send(msg sip.Message) error {
 				case "TCP":
 					if addr, err := net.ResolveTCPAddr("tcp", addrStr); err == nil {
 						port := sip.Port(addr.Port)
-						target.Host = addr.IP.String()
+						if addr.IP.To4() == nil {
+							target.Host = fmt.Sprintf("[%v]", addr.IP.String())
+						} else {
+							target.Host = addr.IP.String()
+						}
 						target.Port = &port
 					}
 				}
 			}
 		}
+
+		msg.Recipient().UriParams().Remove("transport")
 
 		logger := log.AddFieldsFrom(tpl.Log(), protocol, msg)
 		logger.Debugf("sending SIP request:\n%s", msg)
@@ -303,9 +300,9 @@ func (tpl *layer) Send(msg sip.Message) error {
 		// RFC 3261 - 18.2.2.
 	case sip.Response:
 		// resolve protocol from Via
-		protocol, ok := tpl.protocols.get(protocolKey(msg.Transport()))
-		if !ok {
-			return UnsupportedProtocolError(fmt.Sprintf("protocol %s is not supported", viaHop.Transport))
+		protocol, err := tpl.getProtocol(msg.Transport())
+		if err != nil {
+			return err
 		}
 
 		target, err := NewTargetFromAddr(msg.Destination())
@@ -329,6 +326,20 @@ func (tpl *layer) Send(msg sip.Message) error {
 	}
 }
 
+func (tpl *layer) getProtocol(network string) (Protocol, error) {
+	network = strings.ToLower(network)
+	return tpl.protocols.getOrPutNew(protocolKey(network), func() (Protocol, error) {
+		return protocolFactory(
+			network,
+			tpl.pmsgs,
+			tpl.perrs,
+			tpl.canceled,
+			tpl.msgMapper,
+			tpl.Log(),
+		)
+	})
+}
+
 func (tpl *layer) serveProtocols() {
 	defer func() {
 		tpl.dispose()
@@ -338,7 +349,7 @@ func (tpl *layer) serveProtocols() {
 	tpl.Log().Debug("begin serve protocols")
 	defer tpl.Log().Debug("stop serve protocols")
 
-	// 处理传输层数据
+	//note-处理传输层数据
 	for {
 		select {
 		case <-tpl.canceled:
@@ -429,6 +440,22 @@ func (store *protocolStore) get(key protocolKey) (Protocol, bool) {
 	defer store.mu.RUnlock()
 	protocol, ok := store.protocols[key]
 	return protocol, ok
+}
+
+func (store *protocolStore) getOrPutNew(key protocolKey, factory func() (Protocol, error)) (Protocol, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	protocol, ok := store.protocols[key]
+	if ok {
+		return protocol, nil
+	}
+	var err error
+	protocol, err = factory()
+	if err != nil {
+		return nil, err
+	}
+	store.protocols[key] = protocol
+	return protocol, nil
 }
 
 func (store *protocolStore) drop(key protocolKey) bool {
