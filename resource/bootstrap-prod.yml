@@ -4,7 +4,7 @@ cc:
   redis: # redis server
     # must config
     database: 0
-    password: chongC@123
+    password: witeam@123
     sentinel:
       nodes:
         - 172.21.88.238:26379
